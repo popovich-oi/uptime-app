@@ -1,6 +1,12 @@
 package monitorcontroller
 
-import "testing"
+import (
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
 
 func TestValidURL(t *testing.T) {
 	for _, value := range []string{"https://example.com", "http://localhost:8080/health"} {
@@ -32,6 +38,57 @@ func TestIntervalSeconds(t *testing.T) {
 	}{{0, "seconds"}, {1, "days"}} {
 		if _, err := intervalSeconds(test.value, test.unit); err == nil {
 			t.Errorf("intervalSeconds(%d, %q) accepted invalid input", test.value, test.unit)
+		}
+	}
+}
+
+func TestInputLimits(t *testing.T) {
+	for _, tc := range []struct {
+		name, body        string
+		tooLarge, invalid bool
+	}{
+		{"valid", `{"url":"https://example.com","interval_value":1,"interval_unit":"seconds"}`, false, false},
+		{"multiple objects", `{} {}`, false, true},
+		{"oversized", `{"url":"` + strings.Repeat("a", 17<<10) + `"}`, true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var value input
+			err := decodeInput(httptest.NewRecorder(), httptest.NewRequest("POST", "/monitors", strings.NewReader(tc.body)), &value)
+			var limit *http.MaxBytesError
+			if (err != nil) != tc.invalid || errors.As(err, &limit) != tc.tooLarge {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestURLAndIntervalBoundaries(t *testing.T) {
+	base := "https://example.com/"
+	if !validURL(base+strings.Repeat("a", 2048-len(base))) || validURL(base+strings.Repeat("a", 2049-len(base))) {
+		t.Fatal("URL length boundary not enforced")
+	}
+	const max = 9007199254740991
+	for _, tc := range []struct {
+		unit       string
+		multiplier int
+	}{{"seconds", 1}, {"minutes", 60}, {"hours", 3600}} {
+		if _, err := intervalSeconds(max/tc.multiplier, tc.unit); err != nil {
+			t.Errorf("%s maximum rejected: %v", tc.unit, err)
+		}
+		if _, err := intervalSeconds(max/tc.multiplier+1, tc.unit); err == nil {
+			t.Errorf("%s overflow accepted", tc.unit)
+		}
+	}
+}
+
+func TestRoutesRequireAuthorization(t *testing.T) {
+	mux := http.NewServeMux()
+	NewController(nil, nil).RegisterRoutes(mux)
+	for _, method := range []string{"GET", "POST"} {
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, httptest.NewRequest(method, "/monitors", nil))
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("%s: got %d", method, w.Code)
 		}
 	}
 }

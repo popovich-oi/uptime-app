@@ -11,6 +11,7 @@ import (
 
 	"uptime-app/backend/internal/auth"
 	"uptime-app/backend/internal/config"
+	"uptime-app/backend/internal/httpapi"
 	"uptime-app/backend/internal/models"
 	"uptime-app/backend/internal/storage"
 )
@@ -60,12 +61,12 @@ func (c *Controller) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !valid(input, true) {
-		writeError(w, http.StatusBadRequest, "username, valid email and password of at least 8 characters are required")
+		httpapi.WriteError(w, http.StatusBadRequest, "username, valid email and password of at least 8 characters are required")
 		return
 	}
 	user, refresh, err := c.auth.Register(input.Username, input.Email, input.Password)
 	if err != nil {
-		writeError(w, http.StatusConflict, "username or email already exists")
+		httpapi.WriteError(w, http.StatusConflict, "username or email already exists")
 		return
 	}
 	c.respond(w, user, refresh)
@@ -74,12 +75,12 @@ func (c *Controller) register(w http.ResponseWriter, r *http.Request) {
 func (c *Controller) login(w http.ResponseWriter, r *http.Request) {
 	var input credentials
 	if !decode(w, r, &input) || input.Email == "" || input.Password == "" {
-		writeError(w, http.StatusBadRequest, "email and password are required")
+		httpapi.WriteError(w, http.StatusBadRequest, "email and password are required")
 		return
 	}
 	user, refresh, err := c.auth.Login(input.Email, input.Password)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "invalid credentials")
+		httpapi.WriteError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
 	c.respond(w, user, refresh)
@@ -88,12 +89,12 @@ func (c *Controller) login(w http.ResponseWriter, r *http.Request) {
 func (c *Controller) refresh(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(c.cfg.RefreshCookieName)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "invalid refresh token")
+		httpapi.WriteError(w, http.StatusUnauthorized, "invalid refresh token")
 		return
 	}
 	user, refresh, err := c.auth.RotateRefresh(cookie.Value)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "invalid refresh token")
+		httpapi.WriteError(w, http.StatusUnauthorized, "invalid refresh token")
 		return
 	}
 	c.respond(w, user, refresh)
@@ -102,7 +103,7 @@ func (c *Controller) refresh(w http.ResponseWriter, r *http.Request) {
 func (c *Controller) logout(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie(c.cfg.RefreshCookieName); err == nil {
 		if err := c.auth.RevokeRefresh(cookie.Value); err != nil && !errors.Is(err, auth.ErrInvalidRefreshToken) {
-			writeError(w, http.StatusInternalServerError, "could not revoke session")
+			httpapi.WriteError(w, http.StatusInternalServerError, "could not revoke session")
 			return
 		}
 	}
@@ -114,15 +115,15 @@ func (c *Controller) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Controller) profile(w http.ResponseWriter, r *http.Request) {
-	user, ok := c.currentUser(w, r)
+	user, ok := httpapi.CurrentUser(c.auth, w, r)
 	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"user": user})
+	httpapi.WriteJSON(w, http.StatusOK, map[string]any{"user": user})
 }
 
 func (c *Controller) updateProfile(w http.ResponseWriter, r *http.Request) {
-	current, ok := c.currentUser(w, r)
+	current, ok := httpapi.CurrentUser(c.auth, w, r)
 	if !ok {
 		return
 	}
@@ -131,64 +132,64 @@ func (c *Controller) updateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len([]rune(input.Username)) < 3 || len([]rune(input.Username)) > 32 {
-		writeError(w, http.StatusBadRequest, "username must be between 3 and 32 characters")
+		httpapi.WriteError(w, http.StatusBadRequest, "username must be between 3 and 32 characters")
 		return
 	}
 	user, err := c.auth.UpdateUsername(current.ID, input.Username)
 	if err != nil {
-		writeError(w, http.StatusConflict, "username already exists")
+		httpapi.WriteError(w, http.StatusConflict, "username already exists")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"user": user})
+	httpapi.WriteJSON(w, http.StatusOK, map[string]any{"user": user})
 }
 
 func (c *Controller) uploadAvatar(w http.ResponseWriter, r *http.Request) {
-	current, ok := c.currentUser(w, r)
+	current, ok := httpapi.CurrentUser(c.auth, w, r)
 	if !ok {
 		return
 	}
 	name, err := saveAvatar(c.cfg.AvatarDir, r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "Выберите корректное изображение JPEG или PNG размером до 5 МБ")
+		httpapi.WriteError(w, http.StatusBadRequest, "Выберите корректное изображение JPEG или PNG размером до 5 МБ")
 		return
 	}
 	username := r.FormValue("username")
 	user, err := c.auth.UpdateProfile(current.ID, username, "/avatars/"+name)
 	if err != nil {
 		_ = os.Remove(filepath.Join(c.cfg.AvatarDir, name))
-		writeError(w, http.StatusBadRequest, "Не удалось сохранить профиль. Проверьте имя пользователя")
+		httpapi.WriteError(w, http.StatusBadRequest, "Не удалось сохранить профиль. Проверьте имя пользователя")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"user": user})
+	httpapi.WriteJSON(w, http.StatusOK, map[string]any{"user": user})
 }
 
 // uploadFile accepts any file without trusting its name or declared content type.
 func (c *Controller) uploadFile(w http.ResponseWriter, r *http.Request) {
-	if _, ok := c.currentUser(w, r); !ok {
+	if _, ok := httpapi.CurrentUser(c.auth, w, r); !ok {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 26<<20)
 	if err := r.ParseMultipartForm(1 << 20); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid file or file exceeds 25 MB")
+		httpapi.WriteError(w, http.StatusBadRequest, "invalid file or file exceeds 25 MB")
 		return
 	}
 	defer r.MultipartForm.RemoveAll()
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "file is required")
+		httpapi.WriteError(w, http.StatusBadRequest, "file is required")
 		return
 	}
 	defer file.Close()
 	name, err := storage.Save(c.cfg.FileDir, file, 25<<20)
 	if errors.Is(err, storage.ErrTooLarge) {
-		writeError(w, http.StatusRequestEntityTooLarge, "file exceeds 25 MB")
+		httpapi.WriteError(w, http.StatusRequestEntityTooLarge, "file exceeds 25 MB")
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "could not save file")
+		httpapi.WriteError(w, http.StatusInternalServerError, "could not save file")
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]string{"url": "/files/" + name})
+	httpapi.WriteJSON(w, http.StatusCreated, map[string]string{"url": "/files/" + name})
 }
 
 func (c *Controller) downloadFile(w http.ResponseWriter, r *http.Request) {
@@ -214,33 +215,19 @@ func (c *Controller) downloadFile(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, "download", info.ModTime(), file)
 }
 
-func (c *Controller) currentUser(w http.ResponseWriter, r *http.Request) (*models.User, bool) {
-	value := r.Header.Get("Authorization")
-	if len(value) < len("Bearer ") || value[:len("Bearer ")] != "Bearer " {
-		writeError(w, http.StatusUnauthorized, "authorization is required")
-		return nil, false
-	}
-	user, err := c.auth.UserFromAccessToken(value[len("Bearer "):])
-	if err != nil {
-		writeError(w, http.StatusUnauthorized, "invalid access token")
-		return nil, false
-	}
-	return user, true
-}
-
 func (c *Controller) respond(w http.ResponseWriter, user *models.User, refresh string) {
 	access, err := c.auth.AccessToken(user)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "could not issue token")
+		httpapi.WriteError(w, http.StatusInternalServerError, "could not issue token")
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: c.cfg.RefreshCookieName, Value: refresh, Path: "/", HttpOnly: true, Secure: c.cfg.CookieSecure, SameSite: parseSameSite(c.cfg.CookieSameSite), Expires: time.Now().Add(c.cfg.RefreshTTL)})
-	writeJSON(w, http.StatusOK, tokenResponse{AccessToken: access, User: user})
+	httpapi.WriteJSON(w, http.StatusOK, tokenResponse{AccessToken: access, User: user})
 }
 
 func decode(w http.ResponseWriter, r *http.Request, value any) bool {
 	if err := json.NewDecoder(r.Body).Decode(value); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON")
+		httpapi.WriteError(w, http.StatusBadRequest, "invalid JSON")
 		return false
 	}
 	return true
@@ -251,16 +238,6 @@ func valid(value credentials, registration bool) bool {
 		return false
 	}
 	return value.Email != "" && emailPattern.MatchString(value.Email) && value.Password != "" && (!registration || len([]rune(value.Password)) >= 8)
-}
-
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
-}
-
-func writeError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, map[string]string{"error": message})
 }
 
 func parseSameSite(value string) http.SameSite {
