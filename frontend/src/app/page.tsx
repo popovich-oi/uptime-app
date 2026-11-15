@@ -3,7 +3,8 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { request, useAuth } from "./auth";
+import { useAuth } from "./auth";
+import { api } from "./api";
 
 type Monitor = { id: number; url: string; interval_seconds: number; created_at: string };
 type IntervalUnit = "seconds" | "minutes" | "hours";
@@ -39,7 +40,6 @@ export default function Home() {
 }
 
 function MonitorDashboard() {
-  const { accessToken } = useAuth();
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [url, setURL] = useState("");
   const [intervalValue, setIntervalValue] = useState(5);
@@ -51,31 +51,29 @@ function MonitorDashboard() {
   const [loaded, setLoaded] = useState(false);
   const sequence = useRef(0);
   useEffect(() => {
-    if (!accessToken) return;
     const currentSequence = sequence;
     const id = ++currentSequence.current;
     const controller = new AbortController();
-    void request<{ monitors: Monitor[] }>("monitors", { signal: controller.signal, headers: { Authorization: `Bearer ${accessToken}` } })
-      .then((response) => { if (id === sequence.current) { setMonitors(response?.monitors ?? []); setLoaded(true); } })
+    void api.get<{ monitors: Monitor[] }>("monitors", { signal: controller.signal })
+      .then((response) => { if (id === sequence.current) { setMonitors(response.data.monitors ?? []); setLoaded(true); } })
       .catch((cause) => { if (id === sequence.current && !controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Не удалось загрузить точки мониторинга"); })
       .finally(() => { if (id === sequence.current) setLoading(false); });
     return () => { controller.abort(); currentSequence.current++; };
-  }, [accessToken]);
+  }, []);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!accessToken) return;
     if (!Number.isSafeInteger(intervalValue) || intervalValue < 1 || intervalValue > Math.floor(Number.MAX_SAFE_INTEGER / multipliers[intervalUnit])) {
       setError("Укажите допустимый целый интервал."); return;
     }
     setError(null); setPending(true);
     try {
-      await request<{ monitor: Monitor }>("monitors", { method: "POST", body: JSON.stringify({ url, interval_value: intervalValue, interval_unit: intervalUnit }), headers: { Authorization: `Bearer ${accessToken}` } });
+      await api.post<{ monitor: Monitor }>("monitors", { url, interval_value: intervalValue, interval_unit: intervalUnit });
       setURL(""); setOpen(false);
       const id = ++sequence.current;
       setLoading(true);
       try {
-        const response = await request<{ monitors: Monitor[] }>("monitors", { headers: { Authorization: `Bearer ${accessToken}` } });
-        if (id === sequence.current) { setMonitors(response?.monitors ?? []); setLoaded(true); }
+        const response = await api.get<{ monitors: Monitor[] }>("monitors");
+        if (id === sequence.current) { setMonitors(response.data.monitors ?? []); setLoaded(true); }
       } catch (cause) {
         if (id === sequence.current) setError(cause instanceof Error ? cause.message : "Не удалось загрузить точки мониторинга");
       } finally { if (id === sequence.current) setLoading(false); }
