@@ -7,6 +7,7 @@ import (
 	"uptime-app/backend/internal/auth"
 	"uptime-app/backend/internal/config"
 	authcontroller "uptime-app/backend/internal/controllers/auth"
+	monitorcontroller "uptime-app/backend/internal/controllers/monitor"
 	"uptime-app/backend/internal/database"
 )
 
@@ -27,6 +28,7 @@ func main() {
 	service := auth.NewService(db, cfg.JWTSecret, cfg.AccessTTL, cfg.RefreshTTL)
 	mux := http.NewServeMux()
 	authcontroller.NewController(service, cfg).RegisterRoutes(mux)
+	monitorcontroller.NewController(service, db).RegisterRoutes(mux)
 	log.Printf("Server listening on %s", cfg.HTTPAddr)
 	log.Fatal(http.ListenAndServe(cfg.HTTPAddr, mux))
 }

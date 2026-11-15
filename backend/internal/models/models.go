@@ -22,3 +22,12 @@ type RefreshToken struct {
 	CreatedAt time.Time
 	User      User `gorm:"constraint:OnDelete:CASCADE;"`
 }
+
+type Monitor struct {
+	ID              uint      `gorm:"primaryKey" json:"id"`
+	UserID          uint      `gorm:"not null;index" json:"user_id"`
+	URL             string    `gorm:"size:2048;not null" json:"url"`
+	IntervalSeconds int       `gorm:"not null" json:"interval_seconds"`
+	CreatedAt       time.Time `json:"created_at"`
+	User            User      `gorm:"constraint:OnDelete:CASCADE;" json:"-"`
+}

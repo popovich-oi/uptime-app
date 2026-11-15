@@ -33,7 +33,7 @@ func Open(dsn string) (*gorm.DB, error) {
 // service. It is intentionally kept in the database module so the server
 // entrypoint does not know ORM or schema details.
 func Migrate(db *gorm.DB) error {
-	return db.AutoMigrate(&models.User{}, &models.RefreshToken{})
+	return db.AutoMigrate(&models.User{}, &models.RefreshToken{}, &models.Monitor{})
 }
 
 // Close releases the underlying database/sql connection pool.
