@@ -59,7 +59,22 @@ input:focus { outline: 3px solid #3867d633; border-color: #3867d6; }
 .profile__logout:hover { background: #fff2f0; }
 .profile__logout:disabled { cursor: wait; opacity: .6; }
 .profile__logout--inline { width: auto; margin: 0; padding: 8px 10px; }
-@media (max-width: 600px) { :root { --content-gutter: 20px; } .profile__name { display: none; } .profile-content { padding: 40px var(--content-gutter); } .profile-fields { grid-template-columns: minmax(0, 1fr); gap: 32px; } }
+.monitor-content { max-width: var(--content-width); margin: 0 auto; padding: 56px var(--content-gutter); }
+.monitor-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; }
+.monitor-heading h1 { margin-bottom: 8px; }
+.monitor-add { width: auto; white-space: nowrap; }
+.monitor-form { max-width: 620px; margin: 32px 0; padding: 24px; background: #fff; border: 1px solid #dce3ec; border-radius: 16px; }
+.interval-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+select { width: 100%; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; font: inherit; }
+.monitor-empty { margin-top: 40px; padding: 48px 24px; text-align: center; background: #fff; border: 1px dashed #cbd5e1; border-radius: 16px; }
+.monitor-empty h2 { margin: 0 0 8px; color: #172033; }
+.monitor-list { display: grid; gap: 12px; margin-top: 32px; }
+.monitor-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 24px; background: #fff; border: 1px solid #dce3ec; border-radius: 14px; }
+.monitor-card div { display: grid; gap: 7px; min-width: 0; }
+.monitor-card strong { overflow-wrap: anywhere; }
+.monitor-card span { color: #667085; font-size: .9rem; }
+.monitor-status { padding: 6px 10px; border-radius: 999px; background: #e8f7ef; color: #16834c !important; white-space: nowrap; }
+@media (max-width: 600px) { :root { --content-gutter: 20px; } .profile__name { display: none; } .profile-content { padding: 40px var(--content-gutter); } .profile-fields { grid-template-columns: minmax(0, 1fr); gap: 32px; } .monitor-content { padding: 40px var(--content-gutter); } .monitor-heading { align-items: stretch; flex-direction: column; } .monitor-add { width: 100%; } }
 
 .profile__avatar img, .profile-avatar-preview img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .profile-avatar-preview { width: 96px; height: 96px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: #e8edf5; font-size: 2rem; margin-bottom: 1rem; }
