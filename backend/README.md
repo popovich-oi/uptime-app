@@ -18,7 +18,9 @@ docker compose up -d postgres
 go run ./cmd/server
 ```
 
-Сервер доступен на `http://localhost:8080`. Эндпоинты:
+Сервер доступен на `http://localhost:8080`. Для прямых браузерных запросов CORS разрешает origin `http://localhost:3000` и передачу cookie. Для другого frontend задайте `CORS_ALLOWED_ORIGIN` как точный origin, включая схему и порт, без завершающего `/`; `*` не поддерживается. CORS не заменяет авторизацию и защиту от CSRF. При стандартном запуске frontend использует прокси Next.js.
+
+Эндпоинты:
 
 ```sh
 curl -i -c cookies.txt -X POST http://localhost:8080/auth/register \
