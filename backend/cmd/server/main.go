@@ -9,6 +9,7 @@ import (
 	authcontroller "uptime-app/backend/internal/controllers/auth"
 	monitorcontroller "uptime-app/backend/internal/controllers/monitor"
 	"uptime-app/backend/internal/database"
+	"uptime-app/backend/internal/httpapi"
 )
 
 func main() {
@@ -30,5 +31,5 @@ func main() {
 	authcontroller.NewController(service, cfg).RegisterRoutes(mux)
 	monitorcontroller.NewController(service, db).RegisterRoutes(mux)
 	log.Printf("Server listening on %s", cfg.HTTPAddr)
-	log.Fatal(http.ListenAndServe(cfg.HTTPAddr, mux))
+	log.Fatal(http.ListenAndServe(cfg.HTTPAddr, httpapi.CORS(mux, cfg.CORSAllowedOrigin)))
 }

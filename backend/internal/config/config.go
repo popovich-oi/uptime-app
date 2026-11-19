@@ -12,6 +12,7 @@ type Config struct {
 	DatabaseURL       string
 	JWTSecret         string
 	HTTPAddr          string
+	CORSAllowedOrigin string
 	AccessTTL         time.Duration
 	RefreshTTL        time.Duration
 	RefreshCookieName string
@@ -26,6 +27,7 @@ func Load() Config {
 		DatabaseURL:       getenv("DATABASE_URL", "host=localhost user=uptime password=uptime dbname=uptime port=5432 sslmode=disable"),
 		JWTSecret:         getenv("JWT_SECRET", "local-development-secret-change-me"),
 		HTTPAddr:          getenv("HTTP_ADDR", ":8080"),
+		CORSAllowedOrigin: getenv("CORS_ALLOWED_ORIGIN", "http://localhost:3000"),
 		AccessTTL:         getDuration("ACCESS_TTL", 15*time.Minute),
 		RefreshTTL:        getDuration("REFRESH_TTL", 30*24*time.Hour),
 		RefreshCookieName: getenv("REFRESH_COOKIE_NAME", "refresh_token"),
