@@ -9,3 +9,5 @@ coverage/
 backend/bin/
 
 backend/uploads/
+
+/docs/tmp
